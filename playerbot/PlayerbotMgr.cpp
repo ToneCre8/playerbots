@@ -903,7 +903,7 @@ std::list<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* args,
 
     if (!strcmp(cmd, "self"))
     {        
-        if (master->GetPlayerbotAI())
+        /*if (master->GetPlayerbotAI())
         {
             DisablePlayerBot(master->GetGUIDLow());
            
@@ -930,7 +930,7 @@ std::list<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* args,
             }
             else
                 messages.push_back("Enable player ai");
-        }
+        }*/
        return messages;
      }
 
