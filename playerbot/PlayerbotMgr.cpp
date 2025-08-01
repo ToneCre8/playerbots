@@ -7,7 +7,7 @@
 #include "playerbot/TravelMgr.h"
 #include "Chat/ChannelMgr.h"
 #include "Social/SocialMgr.h"
-#include "../../BoxerBuddy/BoxerBuddy.h"
+#include "BoxerBuddy.h"
 
 class LoginQueryHolder;
 class CharacterHandler;

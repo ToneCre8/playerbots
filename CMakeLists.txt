@@ -165,6 +165,12 @@ target_include_directories(${LIBRARY_NAME}
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
+# Add PlayerBots include paths
+target_include_directories(${LIBRARY_NAME}
+  PUBLIC
+    ${CMAKE_SOURCE_DIR}/src/modules/BoxerBuddy
+)
+
 # Install config files
 if ( ${CMAKE_PROJECT_NAME} MATCHES "Classic")
 	configure_file(${CMAKE_CURRENT_SOURCE_DIR}/playerbot/aiplayerbot.conf.dist.in ${CMAKE_CURRENT_BINARY_DIR}/aiplayerbot.conf.dist)

@@ -16,9 +16,9 @@
 #include "Guilds/Guild.h"
 
 #include "playerbotDefs.h"
-#include "playerbot/PlayerbotAIAware.h"
+#include "PlayerbotAIAware.h"
 #include "PlayerbotMgr.h"
-#include "playerbot/RandomPlayerbotMgr.h"
+#include "RandomPlayerbotMgr.h"
 #include "ChatHelper.h"
 #include "BroadcastHelper.h"
 #include "PlayerbotAI.h"
