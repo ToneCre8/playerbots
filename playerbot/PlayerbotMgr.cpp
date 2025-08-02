@@ -7,7 +7,6 @@
 #include "playerbot/TravelMgr.h"
 #include "Chat/ChannelMgr.h"
 #include "Social/SocialMgr.h"
-#include "BoxerBuddy.h"
 
 class LoginQueryHolder;
 class CharacterHandler;
@@ -361,7 +360,8 @@ void PlayerbotHolder::OnBotLogin(Player* const bot)
 	PlayerbotAI* ai = bot->GetPlayerbotAI();
 	if (!ai)
 	{
-		bot->CreatePlayerbotAI();
+        auto newAI = std::make_unique<PlayerbotAI>(bot);
+        bot->CreatePlayerbotAI(std::move(newAI));
 		ai = bot->GetPlayerbotAI();
 	}
 
@@ -910,14 +910,13 @@ std::list<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* args,
 			messages.push_back("you cannot control bots yet");
 			return messages;
 		}
-
-		auto& masterGuid = master->GetObjectGuid();
-		auto buddy = GetBuddyByGuid(masterGuid);
+				
+        auto buddy       = master->GetPlayerbotAI();
 
 		if (!buddy)
 		{
-			buddies.push_back(std::make_unique<BoxerBuddy>(master));
-			buddy = GetBuddyByGuid(masterGuid);
+            auto newAI = std::make_unique<BuddybotAI>(master);
+            master->CreatePlayerbotAI(std::move(newAI));
 
 			if (buddy)
 			{
@@ -1057,7 +1056,8 @@ std::list<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* args,
 		}
 		else
 		{
-			master->CreatePlayerbotAI();
+            auto newAI = std::make_unique<PlayerbotAI>(master);
+            master->CreatePlayerbotAI(std::move(newAI));
 			ai = master->GetPlayerbotAI();
 			ai->SetMaster(master);
 			ai->ResetStrategies();
@@ -1098,8 +1098,9 @@ std::list<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* args,
 		}
 		else
 		{
-			master->CreatePlayerbotAI();
-			ai = master->GetPlayerbotAI();
+            auto newAI = std::make_unique<PlayerbotAI>(master);
+            master->CreatePlayerbotAI(std::move(newAI));
+            ai = master->GetPlayerbotAI();
 			ai->SetMaster(master);
 			ai->ResetStrategies();
 		}
@@ -1342,16 +1343,6 @@ uint32 PlayerbotHolder::GetPlayerbotsAmount() const
 	}
 
 	return amount;
-}
-
-BoxerBuddy* PlayerbotHolder::GetBuddyByGuid(const ObjectGuid& guid)
-{
-	auto it = std::find_if(buddies.begin(), buddies.end(),
-		[&guid](const std::unique_ptr<BoxerBuddy>& buddy)
-		{
-			return buddy->GetGUID() == guid;
-		});
-	return (it != buddies.end()) ? it->get() : nullptr;
 }
 
 PlayerbotMgr::PlayerbotMgr(Player* const master) : PlayerbotHolder(), master(master), lastErrorTell(0)

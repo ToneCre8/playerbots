@@ -13,7 +13,6 @@ class Player;
 class Unit;
 class Object;
 class Item;
-class BoxerBuddy;
 
 typedef std::map<uint32, Player*> PlayerBotMap;
 typedef std::map<std::string, std::set<std::string> > PlayerBotErrorMap;
@@ -46,7 +45,6 @@ public:
     uint32 GetAccountId(std::string name);
     std::string ListBots(Player* master);
     uint32 GetPlayerbotsAmount() const;
-    BoxerBuddy* GetBuddyByGuid(const ObjectGuid& guid);
 
 protected:
     virtual void OnBotLoginInternal(Player * const bot) = 0;
@@ -54,7 +52,6 @@ protected:
 
 private:
     PlayerBotMap playerBots;
-    std::vector<std::unique_ptr<BoxerBuddy>> buddies;
 
 };
 
