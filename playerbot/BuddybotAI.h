@@ -18,7 +18,14 @@ public:
     //============================================================================================
     // Called on every world tick (don't execute too heavy code here).
     void UpdateAI(uint32 elapsed, bool minimal = false) override;
-
+    void DoNextAction(bool minimal = false) override;
+    bool CanDoSpecificAction(const std::string& name, bool isUseful = true, bool isPossible = true) override;
+    bool DoSpecificAction(const std::string& name, Event event = Event(), bool silent = false) override;
+    void ChangeStrategy(const std::string& name, BotState type) override;
+    void SetMaster(Player* master) override;
+    Player* GetGroupMaster() override;
+    bool HasRealPlayerMaster() override { return true; }
+    void ResetBuddyStrategies(bool autoLoad = true);
     //============================================================================================
 
     bool HandleBuddyMgrCommand(ChatHandler* handler, char const* args);
@@ -42,5 +49,5 @@ public:
     ObjectGuid GetGUID();
 
 private:
-    Player* buddy = nullptr;
+
 };

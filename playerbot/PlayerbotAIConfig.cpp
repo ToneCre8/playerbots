@@ -754,7 +754,7 @@ bool PlayerbotAIConfig::Initialize()
 
     RandomPlayerbotFactory::CreateRandomBots();
     PlayerbotFactory::Init();
-    sRandomItemMgr.Init();
+    /*sRandomItemMgr.Init();
     sPlayerbotTextMgr.LoadBotTexts();
     sPlayerbotTextMgr.LoadBotTextChance();
     sPlayerbotHelpMgr.LoadBotHelpTexts();
@@ -768,10 +768,10 @@ bool PlayerbotAIConfig::Initialize()
     }
 
     sLog.outString("Loading named locations...");
-    sRandomPlayerbotMgr.LoadNamedLocations();
+    sRandomPlayerbotMgr.LoadNamedLocations();*/
 
-    if (sPlayerbotAIConfig.randomBotJoinBG)
-        sRandomPlayerbotMgr.LoadBattleMastersCache();
+  /*  if (sPlayerbotAIConfig.randomBotJoinBG)
+        sRandomPlayerbotMgr.LoadBattleMastersCache();*/
 
     sLog.outString("---------------------------------------");
     sLog.outString("        AI Playerbot initialized       ");
