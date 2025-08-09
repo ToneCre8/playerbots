@@ -1,5 +1,6 @@
 
 #include "BuddybotAI.h"
+#include "MotionGenerators/MovementGenerator.h"
 #include "playerbot/AiFactory.h"
 #include "playerbot/ServerFacade.h"
 #include <algorithm>
@@ -8,93 +9,88 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-
 //=================================================================================================================================================================================
 
-BuddybotAI::BuddybotAI(Player* player) : PlayerbotAI(player) {}
-
-BuddybotAI::~BuddybotAI()
+BuddybotAI::BuddybotAI(Player* player) : PlayerbotAI(player) 
 {
-    // Stop the server
-    //server_.stop();
+    buddyMover.reset(new BuddyMoveAction(this)); 
+}
+
+BuddybotAI::~BuddybotAI() 
+{     
+    Group* group = bot->GetGroup();
+    if (group)
+    {
+        for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
+        {
+            auto member = ref->getSource();
+            if (member == bot)
+                continue;
+
+            auto buddyAI = dynamic_cast<BuddybotAI*>(member->GetPlayerbotAI());
+
+            if (!buddyAI)
+                continue;
+
+            if (buddyAI->GetFollowGUID() == bot->GetObjectGuid())
+            {
+                buddyAI->SetFollowGUID(ObjectGuid());
+            }
+
+            if (buddyAI->GetMaster() == bot)
+            {
+                buddyAI->SetMaster(member);
+            }
+        }
+    }
+
+    buddyMover = nullptr;
 }
 
 //============================================================================================
 //============================================================================================
 // Called on every world tick (don't execute too heavy code here).
 
-void BuddybotAI::UpdateAI(uint32 elapsed, bool minimal)
-{
-    //TellPlayer(bot, BOT_TEXT("We're ticking!"));
+void BuddybotAI::UpdateAI(uint32 elapsed, bool minimal) 
+{ 
+    if (!IsSelfMaster())
+    {
+        if (auto lastFollowed = GetUnit(followGUID))
+        {
+            auto mgt = bot->GetMotionMaster()->GetCurrentMovementGeneratorType();
 
-    //engines[(uint8)BotState::BOT_STATE_NON_COMBAT]->DoNextAction(NULL, 0, minimal, bot->IsTaxiFlying());
+            if (mgt == FOLLOW_MOTION_TYPE)
+            {
 
-    //if (bot->IsInCombat())
-    //    engines[(uint8)BotState::BOT_STATE_COMBAT]->DoNextAction(NULL, 0, minimal, bot->IsTaxiFlying());
+                if (!master->IsMoving() && !bot->IsMoving())
+                {
+                    shouldFollow = true;
+                    StopMoving();
+                }
+            }
 
-    PlayerbotAI::UpdateAI(elapsed, minimal);
+            if (shouldFollow)
+            {
+                if (master->IsMoving() && mgt == IDLE_MOTION_TYPE)
+                {
+                    Follow(lastFollowed, 3.f);
+                }
+            }
+        }
+    }
+    //PlayerbotAI::UpdateAI(elapsed, minimal); 
 }
 
 void BuddybotAI::DoNextAction(bool min)
 {
-    if (!bot->IsInWorld() || bot->IsBeingTeleported() || (GetMaster() && GetMaster()->IsBeingTeleported()))
-    {
-        SetAIInternalUpdateDelay(sPlayerbotAIConfig.globalCoolDown);
-        return;
-    }
-
-    // if in combat but stuck with old data - clear targets
-    if (currentEngine == engines[(uint8)BotState::BOT_STATE_NON_COMBAT] && sServerFacade.IsInCombat(bot))
-    {
-        if (aiObjectContext->GetValue<Unit*>("current target")->Get() != NULL || aiObjectContext->GetValue<ObjectGuid>("attack target")->Get() != ObjectGuid() ||
-            aiObjectContext->GetValue<Unit*>("dps target")->Get() != NULL)
-        {
-            Reset();
-        }
-    }
-
-    bool minimal = !AllowActivity();
-
-    currentEngine->DoNextAction(NULL, 0, (minimal || min), bot->IsTaxiFlying());
-
-    if (!bot->IsInWorld()) //Teleport out of bg
-        return;
-
-    /*if (minimal)
-    {
-        if (!bot->isAFK() && !bot->InBattleGround() && !HasRealPlayerMaster())
-            bot->ToggleAFK();
-
-        SetAIInternalUpdateDelay(sPlayerbotAIConfig.passiveDelay);
-        return;
-    }*/
-    /*  else if (bot->isAFK())
-        bot->ToggleAFK();*/
-}
-
-bool BuddybotAI::CanDoSpecificAction(const std::string& name, bool isUseful, bool isPossible)
-{
-    //TellPlayer(bot, name);
-    return PlayerbotAI::CanDoSpecificAction(name, isUseful, isPossible);
-}
-
-bool BuddybotAI::DoSpecificAction(const std::string& name, Event event, bool silent)
-{
-    //TellPlayer(bot, name);
-    return PlayerbotAI::DoSpecificAction(name, event, silent);
-}
-
-void BuddybotAI::ChangeStrategy(const std::string& name, BotState type)
-{
-    //TellPlayer(bot, name);
-    PlayerbotAI::ChangeStrategy(name, type);
+    
 }
 
 void BuddybotAI::SetMaster(Player* newMaster)
 {
     master = newMaster;
 
-    if (master == bot)
+    /*if (IsSelfMaster())
     {
         bot->clearUnitState(UNIT_STAT_FOLLOW);
         ChangeStrategy("-follow", BotState::BOT_STATE_NON_COMBAT);
@@ -103,15 +99,139 @@ void BuddybotAI::SetMaster(Player* newMaster)
     {
         bot->addUnitState(UNIT_STAT_FOLLOW);
         ChangeStrategy("+follow", BotState::BOT_STATE_NON_COMBAT);
-    }
+    }*/
 }
 
 Player* BuddybotAI::GetGroupMaster() { return master; }
 
+void BuddybotAI::HandleCommand(uint32 type, const std::string& text, Player& fromPlayer, const uint32 lang)
+{
+    std::string filtered = text;
+
+     if (filtered.find("BOT\t") == 0) //Mangosbot has BOT prefix so we remove that.
+        filtered = filtered.substr(4);
+
+    if (filtered.rfind("leader", 0) == 0)
+    {
+        Group* group = fromPlayer.GetGroup();
+        if (group)
+        {
+            for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
+            {
+                auto member  = ref->getSource();
+
+                auto buddyAI = dynamic_cast<BuddybotAI*>(member->GetPlayerbotAI());
+
+                if (!buddyAI)
+                    continue;
+
+                buddyAI->SetMaster(&fromPlayer);
+            }
+        }
+        return;
+    }
+
+    if (filtered.rfind("castunit", 0) == 0)
+    {
+        std::istringstream iss(filtered);
+        std::string cmd;
+        std::string guidStr; // keep as string
+        uint32 spellId = 0;
+        iss >> cmd >> guidStr >> spellId;
+
+        if (guidStr.empty() || !spellId)
+        {
+            fromPlayer.GetSession()->SendNotification("Usage: castunit <guid> <spellid>");
+            return;
+        }
+
+        // Parse as hex (0x prefix is fine)
+        uint64 guid  = std::stoull(guidStr, nullptr, 16);
+
+        Unit* target = ObjectAccessor::GetUnit(fromPlayer, ObjectGuid(guid));
+        if (!target)
+        {
+            fromPlayer.GetSession()->SendNotification("Unit not found.");
+            return;
+        }
+
+        const SpellEntry* pSpellInfo  = sServerFacade.LookupSpellInfo(spellId);
+        auto spell                    = std::make_unique<Spell>(bot, pSpellInfo, false);
+
+        SpellRangeEntry const* srange = sSpellRangeStore.LookupEntry(pSpellInfo->rangeIndex);
+        float range                   = GetSpellMaxRange(srange);
+        float minRange                = GetSpellMinRange(srange);
+        float dist                    = bot->GetDistance(target, true, DIST_CALC_COMBAT_REACH);
+
+        if (dist > range)
+        {
+            if (!IsSafe(target))
+                return;
+
+            const auto mm = bot->GetMotionMaster();
+
+            float tx      = target->GetPositionX();
+            float ty      = target->GetPositionY();
+            float tz      = target->GetPositionZ();
+
+            mm->Clear();
+            mm->MoveChase(target);
+
+            fromPlayer.GetSession()->SendNotification("Moving in range for %s", pSpellInfo->SpellName);
+        }
+        else
+        {
+            //fromPlayer.CastSpell(target, spellId, TRIGGERED_NONE); // Fireball, for example
+            //fromPlayer.HandleEmoteCommand(EMOTE_ONESHOT_SPELLCAST); // Animates casting
+            //fromPlayer.GetSession()->SendPlaySpellVisual(bot->GetObjectGuid(), pSpellInfo->SpellVisual);
+            CastSpell(spellId, target);
+            //fromPlayer.GetSession()->SendNotification("Casting spell %u on %s with range %f", spellId, target->GetName(), range);
+        }
+        return;
+    }
+
+    if (filtered.rfind("followme", 0) == 0) 
+    {
+         Group* group = fromPlayer.GetGroup();
+
+        if (group)
+        {
+            for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
+            {
+                auto member  = ref->getSource();
+                               
+                auto buddyAI = dynamic_cast<BuddybotAI*>(member->GetPlayerbotAI());
+                                
+                if (!buddyAI)
+                    continue;
+
+                buddyAI->SetMaster(&fromPlayer);
+
+                 if (member == &fromPlayer)
+                    continue;
+
+                buddyAI->Follow(&fromPlayer, 3.f);
+            }
+        }
+
+        return;
+    }
+
+    PlayerbotAI::HandleCommand(type, text, fromPlayer, lang);
+}
+
+bool BuddybotAI::CanMove()
+{
+    if (IsSelfMaster())
+        return false;
+
+    return PlayerbotAI::CanMove();
+}
+
 void BuddybotAI::ResetBuddyStrategies(bool autoLoad)
 {
 
-    for (uint8 e = 0; e < (uint8)BotState::BOT_STATE_ALL; e++)
+    /* for (uint8 e = 0; e < (uint8)BotState::BOT_STATE_ALL; e++)
     {
         if (auto engine = engines[e])
         {
@@ -133,7 +253,7 @@ void BuddybotAI::ResetBuddyStrategies(bool autoLoad)
             engine->removeStrategy("follow jump", false);
             engine->Init();
         }
-    }
+    }*/
 
     for (uint8 e = 0; e < (uint8)BotState::BOT_STATE_ALL; e++)
     {
@@ -149,10 +269,10 @@ void BuddybotAI::ResetBuddyStrategies(bool autoLoad)
             {
                 std::string strat = std::string(*it);
 
-                if (strat == "default")
+              /*  if (strat == "default")
                     continue;
                 if (strat == "chat")
-                    continue;
+                    continue;*/
 
                 TellPlayer(bot, strat);
                 if (it != strategies.begin())
@@ -411,7 +531,10 @@ void BuddybotAI::MoveToRange(WorldObject* wo, float range)
         target = GetUnit(guid);
     }
 
-    if (distanceToTarget > range && (!bot->IsMoving() || (target && target->IsMoving())))
+    if (!target)
+        return;
+
+    if (distanceToTarget > range && (!bot->IsMoving() || target->IsMoving()))
     {
         float tx = target->GetPositionX();
         float ty = target->GetPositionY();
@@ -451,7 +574,7 @@ void BuddybotAI::MoveBehind(WorldObject* target, float range)
     //}
 }
 
-bool BuddybotAI::Follow(Unit* target, float followDistance)
+void BuddybotAI::Follow(Unit* target, float followDistance)
 {
     float angle = 0; // GetFollowAngle(player, target);
     Position targetPos;
@@ -464,34 +587,17 @@ bool BuddybotAI::Follow(Unit* target, float followDistance)
     if (!bot->InBattleGround() && sServerFacade.IsDistanceLessOrEqualThan(sServerFacade.GetDistance2d(bot, target), followDistance))
     {
         // botAI->TellError("No need to follow");
-        return false;
+        return;
     }
 
     if (bot->IsNonMeleeSpellCasted(true))
     {
         bot->CastStop();
     }
+    
+    SetFollowGUID(target->GetObjectGuid());
 
-    const auto mm = bot->GetMotionMaster();
-
-    /*if (bot->stopCheckDelay < 100 && bot->stopQueued)
-    {
-        bot->stopQueued = false;
-        mm->Clear();
-        bot->StopMoving();
-    }*/
-
-    if (distance > followDistance && (!bot->IsMoving() || target->IsMoving()))
-    {
-        float tx = target->GetPositionX();
-        float ty = target->GetPositionY();
-        float tz = target->GetPositionZ();
-
-        mm->Clear();
-        mm->MovePoint(0, tx, ty, tz, ForcedMovement::FORCED_MOVEMENT_NONE, true);
-    }
-
-    return false;
+    buddyMover->BuddyFollow(target, followDistance);
 }
 
 void BuddybotAI::ClearMovement()
@@ -522,5 +628,15 @@ Position BuddybotAI::GetPositionBehindTarget(WorldObject* target, float distance
     return Position(newX, newY, newZ, orientation);
 }
 
+void BuddybotAI::SetFollowGUID(ObjectGuid guid) 
+{
+    followGUID = guid;
+}
+
 //===================================================================================================
 //===================================================================================================
+
+void BuddyMoveAction::BuddyFollow(Unit* target, float distance) 
+{ 
+    MovementAction::Follow(target, distance);
+}

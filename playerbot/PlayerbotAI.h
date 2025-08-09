@@ -375,7 +375,7 @@ private:
 public:
     static std::string BotStateToString(BotState state);
 	std::string HandleRemoteCommand(std::string command);
-    void HandleCommand(uint32 type, const std::string& text, Player& fromPlayer, const uint32 lang = LANG_UNIVERSAL);
+    virtual void HandleCommand(uint32 type, const std::string& text, Player& fromPlayer, const uint32 lang = LANG_UNIVERSAL);
     void QueueChatResponse(uint32 msgType, ObjectGuid guid1, ObjectGuid guid2, std::string message, std::string chanName, std::string name, bool noDelay = false);
 	void HandleBotOutgoingPacket(const WorldPacket& packet);
     void HandleMasterIncomingPacket(const WorldPacket& packet);
@@ -625,7 +625,7 @@ public:
     bool IsJumping() { return jumpTime; }
     void SetFallAfterJump() { fallAfterJump = true; }
     void SetJumpTime(uint32 time) { jumpTime = time; }
-    bool CanMove();
+    virtual bool CanMove();
     void StopMoving();
     bool IsInRealGuild();
     void SetPlayerFriend(bool isFriend) {isPlayerFriend = isFriend;}

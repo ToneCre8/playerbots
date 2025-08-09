@@ -1344,28 +1344,7 @@ void PlayerbotMgr::HandleCommand(uint32 type, const std::string& text, uint32 la
         }
         return;
     }
-
-    if (text == "leader")
-    {
-        Group* group = master->GetGroup();
-        if (group)
-        {
-            for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
-            {
-                auto member  = ref->getSource();
-
-                auto buddyAI = dynamic_cast<BuddybotAI*>(member->GetPlayerbotAI());
-
-                if (!buddyAI)
-                    continue;
-
-                buddyAI->SetMaster(master);
-
-            }
-        }
-        return;
-    }
-
+        
     ForEachPlayerbot([&](Player* bot) {
         if (type == CHAT_MSG_SAY)
             if (bot->GetMapId() != master->GetMapId() || sServerFacade.GetDistance2d(bot, master) > 25)
